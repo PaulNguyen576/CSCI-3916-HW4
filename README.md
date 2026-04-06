@@ -1,67 +1,48 @@
-# Assignment Four
-## Purpose
-The purpose of this assignment is to leverage Google’s analytics policies to gather information about the requests being sent in by users.
+# Movie Reviews API (CSCI 3916 HW4)
 
-Using the information already entered to MongoDB for the previous assignment, you will add another collection of reviews that are tied to the movies. This way users can query the database and get the previous information (title, year released and actors) as well as the reviews. These two entities should remain separate! Do not append the reviews to the existing movie information.  
+This project is a Node.js and Express REST API backed by MongoDB that manages users, movies, and movie reviews. It uses JWT authentication so users can sign up, sign in, and then access protected endpoints to create and manage movie data. Reviews are stored in a separate `Reviews` collection and linked to movies by `movieId`, which keeps entities normalized while still allowing joined responses when needed.
 
-Leverage the Async.js library or mongo $lookup aggregation capability to join the entities.
+The API supports returning movie data by itself or, when `reviews=true` is passed on movie routes, returning movies with their associated reviews via MongoDB `$lookup` aggregation. Review creation is protected and automatically records the authenticated username as the reviewer. On success, review creation responds with `201` and `{ "message": "Review created!" }`.
 
+The project also includes analytics tracking for review activity. When a review is submitted, the server sends an event payload with category, action, label, value, and custom fields for movie name and request count. A `/test` endpoint is included to emit a sample analytics event for validation.
 
-## Requirements
-- Create a collection in MongoDB (Mongo Atlas) to hold reviews about existing movies.
-    - A review contains the name of the reviewer, a small quote about what they thought about the movie, and their rating out of five stars.
-        - movieId (from the movie collection)
-        - username
-        - review
-        - rating
-    - The review collection should have at least one review for each movie. – The review can be a simple, ficticious review that you create.
-- This API should build upon the previous API in assignment three.
-    - If the user sends a response with the query parameter reviews=true, then the response should include the movie information as well as all the reviews for the movie. If they do not pass this in, the response should not show the reviews. – The review information should be appended to the response to the user.
-        - Hint: Look at $lookup on how to aggregate two collections
-    - Implement GET/POST (DELETE is optional for reviews)
-        - POST needs to be secured with a JWT authorization token.  The Username in the token should be stored with the review (indicating the user that submitted the review)
-            - If review created send back JSON message { message: 'Review created!' } 
-- Extra Credit:  Add custom analytics to return information about which movies users are querying.
-    - Create a custom analytics policy that describes the number of times each movie has been reviewed. To do this, you will have to send a number of requests for each movie.
-        - Custom Dimension: Movie Name
-        - Custom Metric: Requested:  Value 1 (it will aggregate)
-    - Custom Dimension and Metric should be sent with an Event type 
-        - Event Category: Genre of Movie (e.g. Western)
-        - Event Action: Url Path (e.g. post /reviews)
-        - Event Label: API Request for Movie Review
-        - Event Value: 1 
+## Quick Start
 
+Install dependencies and run the API:
 
-## Submissions
-- Create a Postman test to test your API. You should include the following requests.
-    - All tests from HW3 and
-    - Valid request without the review query parameter (e.g reviews=true on the /movies route)
-    - Invalid request (for a movie not in the database) without the review query parameter. 
-    - Valid request with the review query parameter. (e.g reviews=true on the /movies/:id route)
-    - Valid save review method that associates a review with a movie (save a review for a movie in your DB)
-    - Invalid save review (movie missing from DB)
-    - Export a report from Google Analytics (only if you do the Extra Credit)
+```bash
+npm install
+node server.js
+```
 
-- Create a readme.md at the root of your github repository with the embedded (markdown) to your test collection
-    - Within the collection click the (…), share collection -> Embed
-    - Static Button
-    - Click update link
-    - Include your environment settings
-    - Copy to clipboard 
-- Submit the Url to canvas with the REPO CSC_3916
-- Note: All tests should be testing against your Heroku or Render endpoint
+The server runs at `http://localhost:8080`.
 
-## Rubic
-- This one has an extra credit – code the custom analytics that correctly sends the movie name and they attach a PDF or Excel report from Google Analytics you receive +4
-- -2 if missing reviews collection
-- -2 if missing query parameters ?reviews=true that returns reviews (should include both movie and reviews)
-- -1 for each test that is missing (valid request for movie with query parameter, valid save review, invalid movie request, invalid save review) – for max of (-4 for missing all tests)
-- -2 if you have to manually copy the JWT token to get their tests to run (versus saving it from the sign-in call)
-- Try changing the review data to enter a different review before submitting to validate new review are returned – if not (-1)
+Create a `.env` file in the project root with your database and auth configuration:
 
-## Resources
-- https://github.com/daxko/universal-ga
-- https://developers.google.com/analytics/devguides/collection/analyticsjs/custom-dims-mets 
-- https://cloud.google.com/appengine/docs/flexible/nodejs/integrating-with-analytics
-- https://caolan.github.io/async/index.html
-- https://support.google.com/analytics/answer/2709829
+```dotenv
+DB=<mongodb connection string>
+MONGODB_URI=<mongodb connection string>
+SECRET_KEY=<jwt secret>
+GA_KEY=<ga measurement id or ua tracking id>
+GA_SECRET=<ga4 api secret>
+```
+
+To use protected routes, sign in and send the token as:
+
+```text
+Authorization: JWT <token>
+```
+
+## Endpoint Summary
+
+Authentication is handled through `/signup` and `/signin`. Movie endpoints are available at `/movies` and `/movies/:movieparameter`, with optional review aggregation through `?reviews=true`. Review endpoints are available at `/reviews`, including filtered reads by `movieId` and JWT-protected review creation. The `/test` endpoint is provided for analytics verification.
+
+## Testing
+
+Run the test suite with:
+
+```bash
+npm test
+```
+
+This project demonstrates secure API design, normalized MongoDB modeling, aggregation of related entities, and analytics instrumentation in a single backend service.
