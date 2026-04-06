@@ -1,9 +1,11 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const passport = require('passport');
 const authJwtController = require('./auth_jwt'); // You're not using authController, consider removing it
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const rp = require('request-promise');
 const User = require('./Users');
 const Movie = require('./Movies'); // You're not using Movie, consider removing it
 const Review = require('./Reviews');
@@ -16,8 +18,79 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(passport.initialize());
 
 const router = express.Router();
+const GA_TRACKING_ID = process.env.GA_KEY;
+const GA_API_SECRET = process.env.GA_SECRET;
 
 const shouldIncludeReviews = (req) => String(req.query.reviews).toLowerCase() === 'true';
+
+async function trackDimension(category, action, label, value, dimension, metric) {
+  if (!GA_TRACKING_ID) {
+    return;
+  }
+
+  // GA4 (G-XXXX) path using Measurement Protocol with api_secret.
+  if (GA_TRACKING_ID.startsWith('G-') && GA_API_SECRET) {
+    const ga4Options = {
+      method: 'POST',
+      url: 'https://www.google-analytics.com/mp/collect',
+      qs: {
+        measurement_id: GA_TRACKING_ID,
+        api_secret: GA_API_SECRET
+      },
+      json: true,
+      body: {
+        client_id: crypto.randomBytes(16).toString('hex'),
+        events: [
+          {
+            name: 'movie_review_request',
+            params: {
+              event_category: category,
+              event_action: action,
+              event_label: label,
+              value: Number(value),
+              movie_name: dimension,
+              requested: Number(metric)
+            }
+          }
+        ]
+      },
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    };
+
+    return rp(ga4Options);
+  }
+
+  // Legacy UA path (assignment sample format).
+  const uaOptions = {
+    method: 'GET',
+    url: 'https://www.google-analytics.com/collect',
+    qs: {
+      // API Version.
+      v: '1',
+      // Tracking ID / Property ID.
+      tid: GA_TRACKING_ID,
+      // Random Client Identifier.
+      cid: crypto.randomBytes(16).toString('hex'),
+      // Event hit type.
+      t: 'event',
+      // Event category/action/label/value.
+      ec: category,
+      ea: action,
+      el: label,
+      ev: value,
+      // Custom Dimension and Metric.
+      cd1: dimension,
+      cm1: metric
+    },
+    headers: {
+      'Cache-Control': 'no-cache'
+    }
+  };
+
+  return rp(uaOptions);
+}
 
 // Removed getJSONObjectForMovieRequirement as it's not used
 
@@ -218,6 +291,19 @@ router.route('/reviews')
       });
 
       await newReview.save();
+
+      // Track review API request for analytics policy.
+      trackDimension(
+        movie.genre || 'Unknown',
+        `${req.method.toLowerCase()} ${req.path}`,
+        'API Request for Movie Review',
+        '1',
+        movie.title,
+        '1'
+      ).catch((analyticsErr) => {
+        console.error('Analytics tracking error:', analyticsErr.message || analyticsErr);
+      });
+
       res.status(201).json({ message: 'Review created!' });
     } catch (err) {
       console.error(err);
@@ -232,6 +318,17 @@ router.route('/reviews')
   })
   .delete(authJwtController.isAuthenticated, (req, res) => {
     res.status(405).json({ success: false, message: 'DELETE not supported on /reviews.' });
+  });
+
+router.route('/test')
+  .get(async (req, res) => {
+    try {
+      await trackDimension('Feedback', 'Rating', 'Feedback for Movie', '3', 'Guardians of the Galaxy 2', '1');
+      res.status(200).send('Event tracked.').end();
+    } catch (err) {
+      console.error(err);
+      res.status(500).send('Event tracking failed.').end();
+    }
   });
 
 app.use('/', router);
