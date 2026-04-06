@@ -49,12 +49,13 @@
           }
         },
         "url": {
-          "raw": "http://localhost:8080/signin",
-          "protocol": "http",
+          "raw": "https://csci-3916-hw4.onrender.com/signin",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "csci-3916-hw4",
+            "onrender",
+            "com"
           ],
-          "port": "8080",
           "path": [
             "signin"
           ]
@@ -74,6 +75,7 @@
               "});",
               "",
               "pm.test('Response indicates failure', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
               "  var json = pm.response.json();",
               "  pm.expect(json.success).to.eql(false);",
               "});"
@@ -94,15 +96,16 @@
           }
         ],
         "url": {
-          "raw": "http://localhost:8080/movies/{{missingMovieParam}}",
-          "protocol": "http",
+          "raw": "https://csci-3916-hw4.onrender.com/movies/Batman",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "csci-3916-hw4",
+            "onrender",
+            "com"
           ],
-          "port": "8080",
           "path": [
             "movies",
-            "{{missingMovieParam}}"
+            "Batman"
           ]
         }
       },
@@ -144,14 +147,14 @@
           }
         ],
         "url": {
-          "raw": "http://localhost:8080/movies/{{movieParam}}?reviews=true",
-          "protocol": "http",
+          "raw": "https://csci-3916-hw4.onrender.com/{{movieParam}}?reviews=true",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "csci-3916-hw4",
+            "onrender",
+            "com"
           ],
-          "port": "8080",
           "path": [
-            "movies",
             "{{movieParam}}"
           ],
           "query": [
@@ -210,12 +213,13 @@
           }
         },
         "url": {
-          "raw": "http://localhost:8080/reviews",
-          "protocol": "http",
+          "raw": "https://csci-3916-hw4.onrender.com/reviews",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "csci-3916-hw4",
+            "onrender",
+            "com"
           ],
-          "port": "8080",
           "path": [
             "reviews"
           ]
@@ -269,12 +273,13 @@
           }
         },
         "url": {
-          "raw": "http://localhost:8080/reviews",
-          "protocol": "http",
+          "raw": "https://csci-3916-hw4.onrender.com/reviews",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "csci-3916-hw4",
+            "onrender",
+            "com"
           ],
-          "port": "8080",
           "path": [
             "reviews"
           ]
