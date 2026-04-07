@@ -20,6 +20,7 @@ app.use(passport.initialize());
 const router = express.Router();
 const GA_TRACKING_ID = process.env.GA_KEY;
 const GA_API_SECRET = process.env.GA_SECRET;
+const GA_DEBUG = String(process.env.GA_DEBUG).toLowerCase() === 'true';
 
 const shouldIncludeReviews = (req) => String(req.query.reviews).toLowerCase() === 'true';
 
@@ -30,9 +31,14 @@ async function trackDimension(category, action, label, value, dimension, metric)
 
   // GA4 (G-XXXX) path using Measurement Protocol with api_secret.
   if (GA_TRACKING_ID.startsWith('G-') && GA_API_SECRET) {
+    const sessionId = String(Math.floor(Date.now() / 1000));
+    const ga4Url = GA_DEBUG
+      ? 'https://www.google-analytics.com/debug/mp/collect'
+      : 'https://www.google-analytics.com/mp/collect';
+
     const ga4Options = {
       method: 'POST',
-      url: 'https://www.google-analytics.com/mp/collect',
+      url: ga4Url,
       qs: {
         measurement_id: GA_TRACKING_ID,
         api_secret: GA_API_SECRET
@@ -44,6 +50,8 @@ async function trackDimension(category, action, label, value, dimension, metric)
           {
             name: 'movie_review_request',
             params: {
+              session_id: sessionId,
+              engagement_time_msec: 100,
               event_category: category,
               event_action: action,
               event_label: label,
@@ -59,7 +67,13 @@ async function trackDimension(category, action, label, value, dimension, metric)
       }
     };
 
-    return rp(ga4Options);
+    const ga4Response = await rp(ga4Options);
+
+    if (GA_DEBUG && ga4Response && Array.isArray(ga4Response.validationMessages) && ga4Response.validationMessages.length > 0) {
+      console.error('GA debug validation messages:', ga4Response.validationMessages);
+    }
+
+    return ga4Response;
   }
 
   // Legacy UA path (assignment sample format).
@@ -91,6 +105,16 @@ async function trackDimension(category, action, label, value, dimension, metric)
 
   return rp(uaOptions);
 }
+
+router.get('/', async (req, res) => {
+  try {
+    await trackDimension('Traffic', 'get /', 'Render Root Visit', '1', '/', '1');
+  } catch (err) {
+    console.error('Analytics tracking error:', err.message || err);
+  }
+
+  res.status(200).json({ success: true, message: 'Movie Reviews API is running.' });
+});
 
 // Removed getJSONObjectForMovieRequirement as it's not used
 
