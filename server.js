@@ -5,7 +5,6 @@ const passport = require('passport');
 const authJwtController = require('./auth_jwt'); // You're not using authController, consider removing it
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const rp = require('request-promise');
 const User = require('./Users');
 const Movie = require('./Movies'); // You're not using Movie, consider removing it
 const Review = require('./Reviews');
@@ -23,6 +22,46 @@ const GA_API_SECRET = process.env.GA_SECRET;
 const GA_DEBUG = String(process.env.GA_DEBUG).toLowerCase() === 'true';
 
 const shouldIncludeReviews = (req) => String(req.query.reviews).toLowerCase() === 'true';
+
+async function sendRequest({ method, url, qs, body, headers }) {
+  const requestUrl = new URL(url);
+
+  if (qs) {
+    Object.entries(qs).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        requestUrl.searchParams.append(key, String(value));
+      }
+    });
+  }
+
+  const requestHeaders = { ...(headers || {}) };
+  const options = {
+    method,
+    headers: requestHeaders
+  };
+
+  if (body !== undefined) {
+    requestHeaders['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(requestUrl.toString(), options);
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Analytics request failed with status ${response.status}`);
+  }
+
+  if (!responseText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch (_err) {
+    return responseText;
+  }
+}
 
 async function trackDimension(category, action, label, value, dimension, metric) {
   if (!GA_TRACKING_ID) {
@@ -67,7 +106,7 @@ async function trackDimension(category, action, label, value, dimension, metric)
       }
     };
 
-    const ga4Response = await rp(ga4Options);
+    const ga4Response = await sendRequest(ga4Options);
 
     if (GA_DEBUG && ga4Response && Array.isArray(ga4Response.validationMessages) && ga4Response.validationMessages.length > 0) {
       console.error('GA debug validation messages:', ga4Response.validationMessages);
@@ -103,7 +142,7 @@ async function trackDimension(category, action, label, value, dimension, metric)
     }
   };
 
-  return rp(uaOptions);
+  return sendRequest(uaOptions);
 }
 
 router.get('/', async (req, res) => {
