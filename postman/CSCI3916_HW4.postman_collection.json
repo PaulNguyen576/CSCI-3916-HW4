@@ -15,13 +15,13 @@
           "script": {
             "exec": [
               "pm.test('Status is 200', function () {",
-              "  pm.response.to.have.status(200);",
+              "    pm.response.to.have.status(200);",
               "});",
               "",
               "pm.test('Token exists', function () {",
-              "  var json = pm.response.json();",
-              "  pm.expect(json.token).to.be.a('string').and.not.empty;",
-              "  pm.collectionVariables.set('token', json.token);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.token).to.be.a('string').and.not.empty;",
+              "    pm.environment.set('token', json.token);",
               "});"
             ],
             "type": "text/javascript",
@@ -35,13 +35,12 @@
         "header": [
           {
             "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
+            "value": "application/json"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"testuser5000\",\n  \"password\": \"{{password}}\"\n}",
+          "raw": "{\n  \"username\": \"testuser5000\",\n\t\"password\": \"password123\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -147,7 +146,7 @@
           }
         ],
         "url": {
-          "raw": "https://csci-3916-hw4.onrender.com/{{movieParam}}?reviews=true",
+          "raw": "https://csci-3916-hw4.onrender.com/movies/{{movieParam}}?reviews=true",
           "protocol": "https",
           "host": [
             "csci-3916-hw4",
@@ -155,6 +154,7 @@
             "com"
           ],
           "path": [
+            "movies",
             "{{movieParam}}"
           ],
           "query": [
@@ -324,10 +324,6 @@
     {
       "key": "password",
       "value": "password123"
-    },
-    {
-      "key": "token",
-      "value": ""
     },
     {
       "key": "movieParam",
