@@ -15,7 +15,7 @@ npm install
 node server.js
 ```
 
-The server runs at `http://localhost:8080`.
+The server runs at `https://csci-3916-hw4.onrender.com`.
 
 Create a `.env` file in the project root with your database and auth configuration:
 
