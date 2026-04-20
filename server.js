@@ -1,12 +1,13 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const passport = require('passport');
-const authJwtController = require('./auth_jwt'); // You're not using authController, consider removing it
+const authJwtController = require('./auth_jwt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const User = require('./Users');
-const Movie = require('./Movies'); // You're not using Movie, consider removing it
+const Movie = require('./Movies');
 const Review = require('./Reviews');
 
 const app = express();
@@ -68,7 +69,6 @@ async function trackDimension(category, action, label, value, dimension, metric)
     return;
   }
 
-  // GA4 (G-XXXX) path using Measurement Protocol with api_secret.
   if (GA_TRACKING_ID.startsWith('G-') && GA_API_SECRET) {
     const sessionId = String(Math.floor(Date.now() / 1000));
     const ga4Url = GA_DEBUG
@@ -115,25 +115,18 @@ async function trackDimension(category, action, label, value, dimension, metric)
     return ga4Response;
   }
 
-  // Legacy UA path (assignment sample format).
   const uaOptions = {
     method: 'GET',
     url: 'https://www.google-analytics.com/collect',
     qs: {
-      // API Version.
       v: '1',
-      // Tracking ID / Property ID.
       tid: GA_TRACKING_ID,
-      // Random Client Identifier.
       cid: crypto.randomBytes(16).toString('hex'),
-      // Event hit type.
       t: 'event',
-      // Event category/action/label/value.
       ec: category,
       ea: action,
       el: label,
       ev: value,
-      // Custom Dimension and Metric.
       cd1: dimension,
       cm1: metric
     },
@@ -155,54 +148,51 @@ router.get('/', async (req, res) => {
   res.status(200).json({ success: true, message: 'Movie Reviews API is running.' });
 });
 
-// Removed getJSONObjectForMovieRequirement as it's not used
-
-router.post('/signup', async (req, res) => { // Use async/await
+router.post('/signup', async (req, res) => {
   if (!req.body.username || !req.body.password) {
-    return res.status(400).json({ success: false, msg: 'Please include both username and password to signup.' }); // 400 Bad Request
+    return res.status(400).json({ success: false, msg: 'Please include both username and password to signup.' });
   }
 
   try {
-    const user = new User({ // Create user directly with the data
+    const user = new User({
       name: req.body.name,
       username: req.body.username,
       password: req.body.password,
     });
 
-    await user.save(); // Use await with user.save()
+    await user.save();
 
-    res.status(201).json({ success: true, msg: 'Successfully created new user.' }); // 201 Created
+    res.status(201).json({ success: true, msg: 'Successfully created new user.' });
   } catch (err) {
-    if (err.code === 11000) { // Strict equality check (===)
-      return res.status(409).json({ success: false, message: 'A user with that username already exists.' }); // 409 Conflict
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A user with that username already exists.' });
     } else {
-      console.error(err); // Log the error for debugging
-      return res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' }); // 500 Internal Server Error
+      console.error(err);
+      return res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' });
     }
   }
 });
 
-
-router.post('/signin', async (req, res) => { // Use async/await
+router.post('/signin', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.body.username }).select('name username password');
 
     if (!user) {
-      return res.status(401).json({ success: false, msg: 'Authentication failed. User not found.' }); // 401 Unauthorized
+      return res.status(401).json({ success: false, msg: 'Authentication failed. User not found.' });
     }
 
-    const isMatch = await user.comparePassword(req.body.password); // Use await
+    const isMatch = await user.comparePassword(req.body.password);
 
     if (isMatch) {
-      const userToken = { id: user._id, username: user.username }; // Use user._id (standard Mongoose)
-      const token = jwt.sign(userToken, process.env.SECRET_KEY, { expiresIn: '1h' }); // Add expiry to the token (e.g., 1 hour)
+      const userToken = { id: user._id, username: user.username };
+      const token = jwt.sign(userToken, process.env.SECRET_KEY, { expiresIn: '1h' });
       res.json({ success: true, token: 'JWT ' + token });
     } else {
-      res.status(401).json({ success: false, msg: 'Authentication failed. Incorrect password.' }); // 401 Unauthorized
+      res.status(401).json({ success: false, msg: 'Authentication failed. Incorrect password.' });
     }
   } catch (err) {
-    console.error(err); // Log the error
-    res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' }); // 500 Internal Server Error
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' });
   }
 });
 
@@ -215,11 +205,19 @@ router.route('/movies')
         movies = await Movie.aggregate([
           {
             $lookup: {
-              from: 'Reviews',
+              from: 'reviews',
               localField: '_id',
               foreignField: 'movieId',
-              as: 'reviews'
+              as: 'movieReviews'
             }
+          },
+          {
+            $addFields: {
+              avgRating: { $ifNull: [{ $avg: '$movieReviews.rating' }, 0] }
+            }
+          },
+          {
+            $sort: { avgRating: -1 }
           }
         ]);
       } else {
@@ -262,22 +260,25 @@ router.route('/movies/:movieparameter')
       if (shouldIncludeReviews(req)) {
         const moviesWithReviews = await Movie.aggregate([
           {
-            $match: {
-              title: req.params.movieparameter
-            }
+            $match: { _id: new mongoose.Types.ObjectId(req.params.movieparameter) }
           },
           {
             $lookup: {
-              from: 'Reviews',
+              from: 'reviews',
               localField: '_id',
               foreignField: 'movieId',
-              as: 'reviews'
+              as: 'movieReviews'
+            }
+          },
+          {
+            $addFields: {
+              avgRating: { $ifNull: [{ $avg: '$movieReviews.rating' }, 0] }
             }
           }
         ]);
         movie = moviesWithReviews[0];
       } else {
-        movie = await Movie.findOne({ title: req.params.movieparameter });
+        movie = await Movie.findById(req.params.movieparameter);
       }
 
       if (!movie) return res.status(404).json({ success: false, message: 'Movie not found.' });
@@ -293,7 +294,7 @@ router.route('/movies/:movieparameter')
   .put(authJwtController.isAuthenticated, async (req, res) => {
     try {
       const updatedMovie = await Movie.findOneAndUpdate(
-        { title: req.params.movieparameter },
+        { _id: new mongoose.Types.ObjectId(req.params.movieparameter) },
         { title: req.body.title, releaseDate: req.body.releaseDate, genre: req.body.genre, actors: req.body.actors },
         { new: true, runValidators: true }
       );
@@ -306,7 +307,7 @@ router.route('/movies/:movieparameter')
   })
   .delete(authJwtController.isAuthenticated, async (req, res) => {
     try {
-      const deletedMovie = await Movie.findOneAndDelete({ title: req.params.movieparameter });
+      const deletedMovie = await Movie.findOneAndDelete({ _id: new mongoose.Types.ObjectId(req.params.movieparameter) });
       if (!deletedMovie) return res.status(404).json({ success: false, message: 'Movie not found.' });
       res.status(200).json({ success: true, msg: 'Movie successfully deleted.', movie: deletedMovie });
     } catch (err) {
@@ -320,7 +321,7 @@ router.route('/reviews')
     try {
       const filter = {};
       if (req.query.movieId) {
-        filter.movieId = req.query.movieId;
+        filter.movieId = new mongoose.Types.ObjectId(req.query.movieId);
       }
 
       const reviews = await Review.find(filter);
@@ -347,7 +348,7 @@ router.route('/reviews')
       }
 
       const newReview = new Review({
-        movieId,
+        movieId: new mongoose.Types.ObjectId(movieId),
         username: req.user.username,
         review,
         rating
@@ -355,7 +356,6 @@ router.route('/reviews')
 
       await newReview.save();
 
-      // Track review API request for analytics policy.
       trackDimension(
         movie.genre || 'Unknown',
         `${req.method.toLowerCase()} ${req.path}`,
@@ -396,9 +396,9 @@ router.route('/test')
 
 app.use('/', router);
 
-const PORT = process.env.PORT || 8080; // Define PORT before using it
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-module.exports = app; // for testing only
+module.exports = app;
