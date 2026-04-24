@@ -4,7 +4,9 @@
   "description": "Web API 3916 Homework 3",
   "main": "server.js",
   "scripts": {
-    "test": "mocha --timeout 10000 --exit"
+    "test": "mocha --timeout 10000 --exit",
+    "migrate:review-collection": "node scripts/migrate-review-collection.js",
+    "migrate:review-collection:drop": "set DROP_OLD_REVIEW_COLLECTION=true&& node scripts/migrate-review-collection.js"
   },
   "repository": {
     "type": "git",

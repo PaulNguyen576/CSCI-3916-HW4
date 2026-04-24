@@ -5,7 +5,7 @@ let chaiHttp = require('chai-http');
 let server = require('../server');
 let User = require('../Users');
 let Movie = require('../Movies');
-let Review = require('../Reviews');
+let Review = require('../Review');
 chai.should();
 
 chai.use(chaiHttp);
