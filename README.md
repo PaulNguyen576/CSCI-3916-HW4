@@ -35,7 +35,35 @@ Authorization: JWT <token>
 
 ## Endpoint Summary
 
-Authentication is handled through `/signup` and `/signin`. Movie endpoints are available at `/movies` and `/movies/:movieparameter`, with optional review aggregation through `?reviews=true`. Review endpoints are available at `/reviews`, including filtered reads by `movieId` and JWT-protected review creation. The `/test` endpoint is provided for analytics verification.
+Authentication is handled through `/signup` and `/signin`. Movie endpoints are available at `/movies`, `/movies/search` (POST), and `/movies/:movieparameter`, with optional review aggregation through `?reviews=true`. Review endpoints are available at `/reviews`, including filtered reads by `movieId` and JWT-protected review creation. The `/test` endpoint is provided for analytics verification.
+
+### Movie Search API (POST)
+
+Use `POST /movies/search` with JWT auth to find movies by partial title and/or partial actor name.
+
+Request body fields:
+
+- `query` (optional): general text searched against both movie title and actor name
+- `title` (optional): text searched against movie title
+- `actor` (optional): text searched against actor names
+
+At least one of `query`, `title`, or `actor` is required.
+
+Example request:
+
+```json
+{
+	"title": "bat",
+	"actor": "bale"
+}
+```
+
+Example response fields:
+
+- `count`: number of matched movies
+- `results[]`: movie documents with:
+	- `matchType`: `title`, `actor`, or `title+actor`
+	- `matchedActors`: actor entries that matched actor search terms
 
 ## Testing
 

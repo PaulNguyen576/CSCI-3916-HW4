@@ -24,6 +24,8 @@ const GA_DEBUG = String(process.env.GA_DEBUG).toLowerCase() === 'true';
 
 const shouldIncludeReviews = (req) => String(req.query.reviews).toLowerCase() === 'true';
 
+const escapeRegex = (input) => String(input).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 async function sendRequest({ method, url, qs, body, headers }) {
   const requestUrl = new URL(url);
 
@@ -251,6 +253,70 @@ router.route('/movies')
   .delete(authJwtController.isAuthenticated, (req, res) => {
     res.status(405).json({ success: false, message: 'DELETE not supported on /movies. Use /movies/:movieparameter.' });
   });
+
+router.post('/movies/search', authJwtController.isAuthenticated, async (req, res) => {
+  try {
+    const query = typeof req.body.query === 'string' ? req.body.query.trim() : '';
+    const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+    const actor = typeof req.body.actor === 'string' ? req.body.actor.trim() : '';
+
+    const titleTerms = [query, title].filter(Boolean);
+    const actorTerms = [query, actor].filter(Boolean);
+
+    const orConditions = [];
+
+    titleTerms.forEach((term) => {
+      orConditions.push({ title: { $regex: escapeRegex(term), $options: 'i' } });
+    });
+
+    actorTerms.forEach((term) => {
+      orConditions.push({ 'actors.actorName': { $regex: escapeRegex(term), $options: 'i' } });
+    });
+
+    if (orConditions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide at least one of: query, title, or actor.'
+      });
+    }
+
+    const movies = await Movie.find({ $or: orConditions });
+
+    const titleRegexes = titleTerms.map((term) => new RegExp(escapeRegex(term), 'i'));
+    const actorRegexes = actorTerms.map((term) => new RegExp(escapeRegex(term), 'i'));
+
+    const results = movies.map((movie) => {
+      const movieObj = movie.toObject();
+      const matchedByTitle = titleRegexes.some((regex) => regex.test(movieObj.title));
+      const matchedActors = actorRegexes.length === 0
+        ? []
+        : (movieObj.actors || []).filter((entry) => actorRegexes.some((regex) => regex.test(entry.actorName || '')));
+
+      const matchType = matchedByTitle && matchedActors.length > 0
+        ? 'title+actor'
+        : matchedByTitle
+          ? 'title'
+          : matchedActors.length > 0
+            ? 'actor'
+            : 'unknown';
+
+      return {
+        ...movieObj,
+        matchType,
+        matchedActors
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: results.length,
+      results
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Error searching movies.' });
+  }
+});
 
 router.route('/movies/:movieparameter')
   .get(authJwtController.isAuthenticated, async (req, res) => {
