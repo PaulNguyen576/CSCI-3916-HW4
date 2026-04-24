@@ -12,6 +12,11 @@ const reviewSchema = new mongoose.Schema({
   rating: { type: Number, min: 0, max: 5, required: true }
 });
 
-const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema, 'reviews');
+// Ensure stale model definitions cannot keep an old collection binding.
+if (mongoose.models.Review) {
+  mongoose.deleteModel('Review');
+}
+
+const Review = mongoose.model('Review', reviewSchema, 'reviews');
 
 module.exports = Review;
