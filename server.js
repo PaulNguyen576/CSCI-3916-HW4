@@ -367,7 +367,10 @@ router.route('/reviews')
         console.error('Analytics tracking error:', analyticsErr.message || analyticsErr);
       });
 
-      res.status(201).json({ message: 'Review created!' });
+      res.status(201).json({
+        message: 'Review created!',
+        collection: Review.collection.name
+      });
     } catch (err) {
       console.error(err);
       if (err.name === 'CastError' || err.name === 'ValidationError') {
